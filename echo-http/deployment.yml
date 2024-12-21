@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo-http-deployment
+  labels:
+    app: echo-http
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: echo-http
+  template:
+    metadata:
+      labels:
+        app: echo-http
+    spec:
+      containers:
+      - name: echo-http
+        image: hashicorp/http-echo:latest
+        args:
+        - "-text=hello world"
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+          requests:
+            memory: "64Mi"
+            cpu: "250m"
+      # nodeSelector:
+      #   kubernetes.io/os: linux
+      # tolerations:
+      # - key: "key"
+      #   operator: "Equal"
+      #   value: "value"
+      #   effect: "NoSchedule"
+      # affinity:
+      #   nodeAffinity:
+      #     requiredDuringSchedulingIgnoredDuringExecution:
+      #       nodeSelectorTerms:
+      #       - matchExpressions:
+      #         - key: kubernetes.io/e2e-az-name
+      #           operator: In
+      #           values:
+      #           - e2e-az1
+      #           - e2e-az2

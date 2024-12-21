@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: echo-http-sa
+  namespace: echo-http
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: echo-http
+  name: echo-http-role
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: echo-http-rolebinding
+  namespace: echo-http
+subjects:
+- kind: ServiceAccount
+  name: echo-http-sa
+  namespace: echo-http
+roleRef:
+  kind: Role
+  name: echo-http-role
+  apiGroup: rbac.authorization.k8s.io
