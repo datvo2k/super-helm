@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: http-echo
+  name: http-echo
+  namespace: echo-http
+spec:
+  selector:
+    matchLabels:
+      app: http-echo
+  template:
+    metadata:
+      labels:
+        app: http-echo
+    spec:
+      containers:
+      - name: http-echo
+        image: mendhak/http-https-echo
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: http-echo
+  namespace: echo-http
+spec:
+  ports:
+  - name: http-echo
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: http-echo
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: http-echo
+  namespace: echo-http
+spec:
+  rules:
+    - host: test.com
+      http:
+        paths:
+          - backend:
+              service:
+                name: http-echo
+                port:
+                  number: 8080
+            path: /
+            pathType: Prefix
