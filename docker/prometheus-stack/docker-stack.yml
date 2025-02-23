@@ -1,90 +1,46 @@
 version: "3.9"
 
 volumes:
-  prometheus_data: {}
-  grafana_data: {}
-  minio_data: {}
+    prometheus_data: {}
+    grafana_data: {}
+    prometheus_config_data: {}
+    alertmanager_config_data: {}
+    minio_data: {}
+
 
 networks:
-  monitor-net:
-    driver: overlay
-    name: inbound
-  traefik:
-    driver: overlay
-    name: traefik
+  front-tier:
+  back-tier:
 
 services:
-  traefik:
-    image: traefik:v3.3.3
-    command:
-      - "--logLevel=DEBUG"
-      - "--api"
-      - "--metrics"
-      - "--metrics.prometheus.buckets=0.1,0.3,1.2,5.0"
-      - "--docker"
-      - "--docker.swarmMode"
-      - "--docker.domain=docker.localhost"
-      - "--docker.watch"
-    networks:
-      - traefik
-      - monitor-net
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    ports:
-      - target: 80
-        published: 80
-        mode: host
-      - target: 443
-        published: 443
-        mode: host
-      - target: 8080
-        published: 8080
-        protocol: tcp
-        mode: ingress
-    deploy:
-      mode: global
-      placement:
-        constraints:
-          - node.role == manager
-      update_config:
-        parallelism: 1
-        delay: 10s
-      restart_policy:
-        condition: on-failure
 
   prometheus:
-    image: prom/prometheus:v3.2.0
-    container_name: prometheus
+    image: prom/prometheus:v2.0.0
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_config_data:/etc/prometheus/
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
-      - '--storage.tsdb.retention.time=2h'
-      - '--web.enable-lifecycle'
-      - '--web.enable-admin-api'
-      - '--web.listen-address=:9002'
-      - '--storage.tsdb.min-block-duration=30m'
-      - '--storage.tsdb.max-block-duration=30m'
+    ports:
+      - 9090:9090
+    links:
+      - cadvisor:cadvisor
+      - alertmanager:alertmanager
+    depends_on:
+      - cadvisor
     networks:
-      - monitor-net
+      - back-tier
+    restart: always
     deploy:
       placement:
         constraints:
-          - node.role==manager
-      labels:
-          - "traefik.frontend.rule=Host:prometheus.localhost"
-          - "traefik.backend=prometheus"
-          - "traefik.port=9090"
-          - "traefik.docker.network=traefik"
-      restart_policy:
-        condition: on-failure
+          - node.hostname == ${HOSTNAME}
 
-  node-exporter::
-    image: prom/node-exporter:v1.9.0
+  node-exporter:
+    image: prom/node-exporter
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
@@ -97,30 +53,27 @@ services:
     ports:
       - 9100:9100
     networks:
-      - monitor-net
+      - back-tier
+    restart: always
     deploy:
       mode: global
-      restart_policy:
-        condition: on-failure
 
   alertmanager:
-    image: prom/alertmanager:v0.28.0
+    image: prom/alertmanager
     ports:
       - 9093:9093
     volumes:
-      - "./alertmanager/:/etc/alertmanager/"
+      - alertmanager_config_data:/etc/alertmanager/
     networks:
-      - monitor-net
+      - back-tier
+    restart: always
     command:
-      - '--config.file=/etc/alertmanager/config.yml'
+      - "--config.file=/etc/alertmanager/config.yml"
       - '--storage.path=/alertmanager'
     deploy:
       placement:
         constraints:
-           - node.role==manager
-      restart_policy:
-        condition: on-failure    
-
+          - node.hostname == ${HOSTNAME}
   cadvisor:
     image: gcr.io/cadvisor/cadvisor
     volumes:
@@ -129,40 +82,35 @@ services:
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
     ports:
-      - 8088:8080
+      - 8080:8080
     networks:
-      - monitor-net
+      - back-tier
+    restart: always
     deploy:
       mode: global
-      restart_policy:
-        condition: on-failure
+  source:
+    image: containerize/git
+    environment: 
+      - REPO_LOCAL=/data/git/repos/prometheus
+      - REPO_BRANCH=version-2
+      - REPO_REMOTE=https://github.com/vegasbrianc/prometheus.git
+    tty: true
+    volumes: 
+      - prometheus_config_data:/data/git/repos/prometheus/prometheus
+      - alertmanager_config_data:/data/git/repos/prometheus/alertmanager
 
   grafana:
-    image: grafana/grafana:11.5.2
+    image: grafana/grafana
     depends_on:
       - prometheus
+    ports:
+      - 3000:3000
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning/:/etc/grafana/provisioning/
-    env_file:
-      - ./grafana/config.monitoring
+    environment: 
+      - GF_SECURITY_ADMIN_PASSWORD=foobar
+      - GF_USERS_ALLOW_SIGN_UP=false
     networks:
-      - monitor-net
-    user: "472"
-    deploy:
-      placement:
-        constraints:
-          - node.role==manager
-      labels:
-        -  "traefik.frontend.rule=Host:grafana.localhost"
-        - "traefik.backend=grafana"
-        - "traefik.port=3000"
-        - "traefik.docker.network=traefik"
-      restart_policy:
-        condition: on-failure
-
-  thanos-sidecar:
-    image: thanosio/thanos:v0.22.0
-    command:
-      - "sidecar"
-      - "--http-address=
+      - back-tier
+      - front-tier
