@@ -1,0 +1,56 @@
+version: '3.9'
+
+volumes:
+  minio_data:
+  prometheus_data:
+
+services:
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ':9001'
+    environment:
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=admin123
+    volumes:
+      - minio_data:/data
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+
+  thanos-sidecar:
+    image: thanosio/thanos:main-2025-02-21-f230915
+    container_name: thanos-sidecar
+    command:
+      - 'sidecar'
+      - '--tsdb.path=/prometheus'
+      - '--prometheus.url=http://prometheus:9090'
+      - '--objstore.config-file=/etc/thanos/storage.yml'
+    volumes:
+      - prometheus_data:/prometheus
+      - ./thanos-storage.yml:/etc/thanos/storage.yml
+    depends_on:
+      - minio
+
+  thanos-query:
+    image: thanosio/thanos:main-2025-02-21-f230915
+    container_name: thanos-query
+    command:
+      - 'query'
+      - '--store=thanos-sidecar:10901'
+      - '--http-address=0.0.0.0:19192'
+    ports:
+      - '19192:19192'
+    depends_on:
+      - thanos-sidecar
+
+  thanos-store:
+    image: thanosio/thanos:main-2025-02-21-f230915
+    container_name: thanos-store
+    command:
+      - 'store'
+      - '--objstore.config-file=/etc/thanos/storage.yml'
+      - '--data-dir=/tmp/thanos/store'
+    volumes:
+      - ./thanos-storage.yml:/etc/thanos/storage.yml
+    depends_on:
+      - minio
