@@ -3,6 +3,7 @@ version: '3.9'
 volumes:
   prometheus_data: {}
   grafana_data: {}
+  alertmanager_data: {}
 
 networks:
   monitoring:
@@ -21,7 +22,7 @@ services:
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
       - '--storage.tsdb.retention.time=200h'
-      - storage.tsdb.min-block-duration=100h'
+      - '--storage.tsdb.min-block-duration=100h'
       - '--storage.tsdb.max-block-duration=100h'
       - '--web.enable-lifecycle'
     ports:
@@ -30,19 +31,20 @@ services:
       - monitoring
     restart: unless-stopped
 
-  alertmanager:
-    image: prom/alertmanager:v0.28.0
-    container_name: alertmanager
-    volumes:
-      - alertmanager_data:/etc/alertmanager
-    command:
-      - '--config.file=/etc/alertmanager/config.yml'
-      - '--storage.path=/alertmanager'
-    ports:
-      - '9093:9093'
-    networks:
-      - monitoring
-    restart: unless-stopped
+  # alertmanager:
+  #   image: prom/alertmanager:v0.28.0
+  #   container_name: alertmanager
+  #   volumes:
+  #     - alertmanager_data:alertmanager
+  #     - ./alertmanager:/etc/alertmanager
+  #   command:
+  #     - '--config.file=/etc/alertmanager/config.yml'
+  #     - '--storage.path=/alertmanager'
+  #   ports:
+  #     - '9093:9093'
+  #   networks:
+  #     - monitoring
+  #   restart: unless-stopped
 
   node-exporter:
     image: prom/node-exporter:v1.9.0
@@ -89,6 +91,8 @@ services:
     - /var/run:/var/run:rw
     - /sys:/sys:ro
     - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - monitoring
     depends_on:
     - redis
 
@@ -97,3 +101,5 @@ services:
     container_name: redis
     ports:
     - '6379:6379'
+    networks:
+      - monitoring
