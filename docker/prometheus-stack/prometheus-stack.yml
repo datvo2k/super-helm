@@ -31,20 +31,16 @@ services:
       - monitoring
     restart: unless-stopped
 
-  # alertmanager:
-  #   image: prom/alertmanager:v0.28.0
-  #   container_name: alertmanager
-  #   volumes:
-  #     - alertmanager_data:alertmanager
-  #     - ./alertmanager:/etc/alertmanager
-  #   command:
-  #     - '--config.file=/etc/alertmanager/config.yml'
-  #     - '--storage.path=/alertmanager'
-  #   ports:
-  #     - '9093:9093'
-  #   networks:
-  #     - monitoring
-  #   restart: unless-stopped
+  alertmanager:
+    image: prom/alertmanager:v0.28.0
+    container_name: alertmanager
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    ports:
+      - '9093:9093'
+    networks:
+      - monitoring
+    restart: unless-stopped
 
   node-exporter:
     image: prom/node-exporter:v1.9.0
