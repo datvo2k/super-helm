@@ -1,0 +1,2 @@
+/k8s/kube-prometheus-stack/*.txt
+/k8s/kube-prometheus-stack/grafana-secret.yml
